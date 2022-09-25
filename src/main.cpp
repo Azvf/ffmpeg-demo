@@ -45,6 +45,9 @@ int main(void)
         glfwTerminate();
         return -1;
     }
+    
+    /* Make the window's context current */
+    glfwMakeContextCurrent(window);
 
     int frameWidth, frameHeight;
     unsigned char* frameData;
@@ -63,15 +66,7 @@ int main(void)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-
-    int iw, ih, n;
-    unsigned char* idata = stbi_load("image.jpg", &iw, &ih, &n, 0);
-
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, iw, ih, 0, GL_RGB, GL_UNSIGNED_BYTE, idata);;
-    // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frameWidth, frameHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, frameData);;
-
-    /* Make the window's context current */
-    glfwMakeContextCurrent(window);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frameWidth, frameHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, frameData);;
 
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))

@@ -10,7 +10,7 @@
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
-
+#include <libswscale/swscale.h>
 }
 
 bool LoadFrame(const char* filename, int* width, int* height, unsigned char** data) {
@@ -115,22 +115,26 @@ bool LoadFrame(const char* filename, int* width, int* height, unsigned char** da
         else if (response < 0) {
             printf("Failed to decode AVPacket\n");
             return false;
-
         }
         
         av_packet_unref(avPacket);
         break;
     }
 
-    uint8_t* frameData = new uint8_t[avFrame->width * avFrame->height * 3];
+    uint8_t* frameData = new uint8_t[avFrame->width * avFrame->height * 4];
 
-    for (int y = 0; y < avFrame->height; y++) {
-        for (int x = 0; x < avFrame->width; x++) {
-            frameData[y * avFrame->width * 3 + x * 3 + 0] = avFrame->data[0][y * avFrame->linesize[0] + x];
-            frameData[y * avFrame->width * 3 + x * 3 + 1] = avFrame->data[0][y * avFrame->linesize[0] + x];
-            frameData[y * avFrame->width * 3 + x * 3 + 2] = avFrame->data[0][y * avFrame->linesize[0] + x];
-        }
+    SwsContext* swsScalerContext = sws_getContext(avFrame->width, avFrame->height, avCodecContext->pix_fmt,
+                                                    avFrame->width, avFrame->height, AV_PIX_FMT_RGB0,
+                                                    SWS_FAST_BILINEAR, nullptr, nullptr, nullptr);
+    if (!swsScalerContext) {
+        printf("Couldn't initialize sw scaler\n");
+        return false;
     }
+
+    uint8_t* dest[4] = { frameData, nullptr, nullptr, nullptr};
+    int dest_linesize[4] = { avFrame->width * 4, 0, 0, 0 };
+    sws_scale(swsScalerContext, avFrame->data, avFrame->linesize, 0, avFrame->height, dest, dest_linesize);
+    sws_freeContext(swsScalerContext);
 
     *width = avFrame->width;
     *height = avFrame->height;
@@ -182,7 +186,7 @@ int main(void)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frameWidth, frameHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, frameData);;
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frameWidth, frameHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, frameData);;
 
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
@@ -201,10 +205,10 @@ int main(void)
         glEnable(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, texHandle);
         glBegin(GL_QUADS);
-            glTexCoord2d(0.0, 0.0); glVertex2i(300, 300);
-            glTexCoord2d(1.0, 0.0); glVertex2i(300 + frameWidth, 300);
-            glTexCoord2d(1.0, 1.0); glVertex2i(300 + frameWidth, 300 + frameHeight);
-            glTexCoord2d(0.0, 1.0); glVertex2i(300, 300 + frameHeight);
+            glTexCoord2d(0.0, 0.0); glVertex2i(0, 0);
+            glTexCoord2d(1.0, 0.0); glVertex2i(frameWidth, 0);
+            glTexCoord2d(1.0, 1.0); glVertex2i(frameWidth, frameHeight);
+            glTexCoord2d(0.0, 1.0); glVertex2i(0, frameHeight);
         glEnd();
         glDisable(GL_TEXTURE_2D);
 

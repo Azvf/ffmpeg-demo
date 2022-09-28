@@ -7,148 +7,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "../lib/stb/stb_image.h"
 
-extern "C" {
-#include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
-#include <libswscale/swscale.h>
-}
-
-bool LoadFrame(const char* filename, int* width, int* height, unsigned char** data) {
-    // FIXME: handle memory leak if something failed. For now just exit the program 
-    AVFormatContext* avFormatContext = avformat_alloc_context();
-     
-    if (!avFormatContext) {
-        printf("Couldn't create AVFormatContext\n");
-        return false;
-    }
-
-    if (avformat_open_input(&avFormatContext, filename, nullptr, nullptr) != 0) {
-        printf("Couldn't open a video file\n");
-        return false;
-    }
-
-    int videoStreamIndex = -1, audioStreamIndex = -1;
-    AVCodecParameters* avCodecParams;
-    AVCodec* avCodec;
-
-    for (int i = 0; i < avFormatContext->nb_streams; i++) {
-        AVStream* stream = avFormatContext->streams[i];
-        
-        avCodecParams = stream->codecpar;
-        
-        if (!avCodecParams) {
-            continue;
-        }
-
-        avCodec = avcodec_find_decoder(avCodecParams->codec_id);
-
-        if (!avCodec) {
-            continue;
-        }
-
-        if (avCodec->type == AVMediaType::AVMEDIA_TYPE_VIDEO) {
-            videoStreamIndex = i;
-            continue;
-        }
-
-        if (avCodec->type == AVMediaType::AVMEDIA_TYPE_AUDIO) {
-            audioStreamIndex = i;
-            continue;
-        }
-    }
-
-    if (videoStreamIndex == -1) {
-        printf("Couldn't find video stream\n");
-        return false;
-    }
-
-    if (videoStreamIndex == -1) {
-        printf("Couldn't find audio stream\n");
-    }
-
-    AVCodecContext* avCodecContext = avcodec_alloc_context3(avCodec);
-    if (!avCodecContext) {
-        printf("Couldn't create AVCodecContext\n");
-        return false;
-    }
-
-    if (avcodec_parameters_to_context(avCodecContext, avCodecParams) < 0) {
-        printf("Couldn't initialize AVCodecContext\n");
-        return false;
-    }
-
-    if (avcodec_open2(avCodecContext, avCodec, nullptr) < 0) {
-        printf("Couldn't open AVCodec\n");
-        return false;
-    }
-
-    AVFrame* avFrame = av_frame_alloc();
-    if (!avFrame) {
-        printf("Couldn't allocate AVFrame\n");
-        return false;
-    }
-    
-    AVPacket* avPacket = av_packet_alloc();
-    if (!avPacket) {
-        printf("Couldn't allocate AVPacket\n");
-        return false;
-    }
-
-    /* processing video packet stream */
-    int response;
-    while (av_read_frame(avFormatContext, avPacket) >= 0) {
-        if (avPacket->stream_index != videoStreamIndex) {
-            continue;
-        }
-
-        response = avcodec_send_packet(avCodecContext, avPacket);
-        if (response < 0) {
-            // printf("Failed to decode AVPacket: %s\n", av_err2str(response));
-            printf("Failed to decode AVPacket\n");
-            return false;
-        }
-
-        response = avcodec_receive_frame(avCodecContext, avFrame);
-        if (response == AVERROR(EAGAIN) || response == AVERROR_EOF) {
-            continue;
-        }
-        else if (response < 0) {
-            printf("Failed to decode AVPacket\n");
-            return false;
-        }
-        
-        av_packet_unref(avPacket);
-        break;
-    }
-
-    uint8_t* frameData = new uint8_t[avFrame->width * avFrame->height * 4];
-
-    SwsContext* swsScalerContext = sws_getContext(avFrame->width, avFrame->height, avCodecContext->pix_fmt,
-                                                    avFrame->width, avFrame->height, AV_PIX_FMT_RGB0,
-                                                    SWS_FAST_BILINEAR, nullptr, nullptr, nullptr);
-    if (!swsScalerContext) {
-        printf("Couldn't initialize sw scaler\n");
-        return false;
-    }
-
-    uint8_t* dest[4] = { frameData, nullptr, nullptr, nullptr};
-    int dest_linesize[4] = { avFrame->width * 4, 0, 0, 0 };
-    sws_scale(swsScalerContext, avFrame->data, avFrame->linesize, 0, avFrame->height, dest, dest_linesize);
-    sws_freeContext(swsScalerContext);
-
-    *width = avFrame->width;
-    *height = avFrame->height;
-    *data = frameData;
-
-    /* post processing */
-    avformat_close_input(&avFormatContext);
-    avformat_free_context(avFormatContext);
-    av_frame_free(&avFrame);
-    av_packet_free(&avPacket);
-    avcodec_free_context(&avCodecContext);
-
-    return true;
-}
+#include "VideoDecoding.h"
 
 int main(void)
 {
@@ -169,14 +28,16 @@ int main(void)
     /* Make the window's context current */
     glfwMakeContextCurrent(window);
 
-    int frameWidth, frameHeight;
-    unsigned char* frameData;
     
-    if (!LoadFrame("video.mp4", &frameWidth, &frameHeight, &frameData)) {
-        printf("Couldn't load video frame\n");
+    VideoDecodingCtx ctx;
+    if (!VideoOpenFile(&ctx, "video.mp4")) {
+        printf("Couldn't open video file\n");
         return 1;
     }
 
+    int frameWidth = ctx.width, frameHeight = ctx.height;
+    uint8_t* frameData = new uint8_t[frameWidth * frameHeight * 4];
+    
     GLuint texHandle;
     glGenTextures(1, &texHandle);
     glBindTexture(GL_TEXTURE_2D, texHandle);
@@ -186,7 +47,6 @@ int main(void)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frameWidth, frameHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, frameData);;
 
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
@@ -194,13 +54,21 @@ int main(void)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         /* Set up Orthographic Projection */
-        int startPoint = 300;
         int windowWidth, windowHeight;
         glfwGetFramebufferSize(window, &windowWidth, &windowHeight);
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
         glOrtho(0.0, windowWidth, windowHeight, 0.0, -1, 1);
         glMatrixMode(GL_MODELVIEW);
+
+        /* Read a video frame */
+        int64_t pts;
+        if (!VideoReadFrame(&ctx, frameData, &pts)) {
+            printf("Couldn't read video frame\n");
+            return 1;
+        }
+        glBindTexture(GL_TEXTURE_2D, texHandle);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frameWidth, frameHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, frameData);;
 
         glEnable(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, texHandle);
@@ -218,6 +86,8 @@ int main(void)
         /* Poll for and process events */
         glfwPollEvents();
     }
+
+    VideoCloseFile(&ctx);
 
     glfwTerminate();
     return 0;

@@ -109,6 +109,7 @@ bool VideoReadFrame(VideoDecodingCtx* ctx, uint8_t* frameBuffer, int64_t* pts) {
     int response;
     while (av_read_frame(avFormatContext, avPacket) >= 0) {
         if (avPacket->stream_index != videoStreamIndex) {
+            av_packet_unref(avPacket);
             continue;
         }
 
@@ -121,6 +122,7 @@ bool VideoReadFrame(VideoDecodingCtx* ctx, uint8_t* frameBuffer, int64_t* pts) {
 
         response = avcodec_receive_frame(avCodecContext, avFrame);
         if (response == AVERROR(EAGAIN) || response == AVERROR_EOF) {
+            av_packet_unref(avPacket);
             continue;
         }
         else if (response < 0) {

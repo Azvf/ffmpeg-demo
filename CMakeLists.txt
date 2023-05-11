@@ -7,7 +7,20 @@ find_package(glfw3 3.3 REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(ffmpeg REQUIRED)
 
-set(SOURCE_FILES src/main.cpp src/VideoDecoding.h src/VideoDecoding.cpp)
+set(SOURCE_FILES 
+	src/main.cpp 
+	src/VideoDecoding.h 
+	src/VideoDecoding.cpp
+
+	src/sf_player.h 
+	src/sf_player.cpp
+	
+	src/qsv_transcode.h 
+	src/qsv_transcode.cpp 
+	
+	src/vaapi_encode.h 
+	src/vaapi_encode.cpp 
+)
 set(EXTERNAL_FILES lib/stb/stb_image.h)
 
 add_executable(ffmpeg-demo ${SOURCE_FILES} ${EXTERNAL_FILES})

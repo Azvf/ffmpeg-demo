@@ -24,32 +24,37 @@ bool VideoOpenFile(VideoDecodingCtx* ctx, const char* filename) {
     videoStreamIndex = -1;
 
     auto audioStreamIndex = -1;
-    AVCodecParameters* avCodecParams;
-    AVCodec* avCodec;
+    const AVCodecParameters* avCodecParams;
+    const AVCodec* videoCodec;
     for (int i = 0; i < avFormatContext->nb_streams; i++) {
+        const AVCodec* codec;
+        const AVCodecParameters* param;
         AVStream* stream = avFormatContext->streams[i];
 
-        avCodecParams = stream->codecpar;
+        param = stream->codecpar;
 
-        if (!avCodecParams) {
+        if (!param) {
             continue;
         }
 
-        avCodec = avcodec_find_decoder(avCodecParams->codec_id);
+        codec = avcodec_find_decoder(param->codec_id);
 
-        if (!avCodec) {
+        if (!codec) {
             continue;
         }
 
-        if (avCodec->type == AVMediaType::AVMEDIA_TYPE_VIDEO) {
+        if (codec->type == AVMediaType::AVMEDIA_TYPE_VIDEO) {
             videoStreamIndex = i;
-            width = avCodecParams->width;
-            height = avCodecParams->height;
+            width = param->width;
+            height = param->height;
             timeBase = stream->time_base;
+            videoCodec = codec;
+            avCodecParams = param;
+
             continue;
         }
 
-        if (avCodec->type == AVMediaType::AVMEDIA_TYPE_AUDIO) {
+        if (codec->type == AVMediaType::AVMEDIA_TYPE_AUDIO) {
             audioStreamIndex = i;
             continue;
         }
@@ -64,7 +69,7 @@ bool VideoOpenFile(VideoDecodingCtx* ctx, const char* filename) {
         printf("Couldn't find audio stream\n");
     }
 
-    avCodecContext = avcodec_alloc_context3(avCodec);
+    avCodecContext = avcodec_alloc_context3(videoCodec);
     if (!avCodecContext) {
         printf("Couldn't create AVCodecContext\n");
         return false;
@@ -75,7 +80,7 @@ bool VideoOpenFile(VideoDecodingCtx* ctx, const char* filename) {
         return false;
     }
 
-    if (avcodec_open2(avCodecContext, avCodec, nullptr) < 0) {
+    if (avcodec_open2(avCodecContext, videoCodec, nullptr) < 0) {
         printf("Couldn't open AVCodec\n");
         return false;
     }

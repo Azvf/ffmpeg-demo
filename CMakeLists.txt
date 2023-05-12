@@ -20,6 +20,12 @@ set(SOURCE_FILES
 	
 	src/vaapi_encode.h 
 	src/vaapi_encode.cpp 
+
+	src/hw_device_test.h
+	src/hw_device_test.cpp
+
+	src/hw_decode.h
+	src/hw_decode.cpp
 )
 set(EXTERNAL_FILES lib/stb/stb_image.h)
 

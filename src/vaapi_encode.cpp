@@ -105,6 +105,9 @@ int vaapi_encode(int argc, char* argv[])
         NULL, NULL, 0);
 
     if (err < 0) {
+        char* temp = new char[AV_ERROR_MAX_STRING_SIZE] {};
+        auto res = av_make_error_string(temp, AV_ERROR_MAX_STRING_SIZE, err);
+
         fprintf(stderr, "Failed to create a VAAPI device. Error code: %d\n", err);
         goto close;
     }

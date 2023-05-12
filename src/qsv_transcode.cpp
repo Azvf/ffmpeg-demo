@@ -129,8 +129,7 @@ static int open_input_file(char* filename)
 
     switch (video->codecpar->codec_id) {
     case AV_CODEC_ID_H264:
-        //decoder = avcodec_find_decoder_by_name("h264_qsv");
-        decoder = avcodec_find_decoder_by_name("h264");
+        decoder = avcodec_find_decoder_by_name("h264_qsv");
         break;
     case AV_CODEC_ID_HEVC:
         decoder = avcodec_find_decoder_by_name("hevc_qsv");
@@ -225,7 +224,7 @@ static int dec_enc(AVPacket* pkt, const AVCodec* enc_codec, char* optstr)
         char* temp = new char[AV_ERROR_MAX_STRING_SIZE] {};
         auto res = av_make_error_string(temp, AV_ERROR_MAX_STRING_SIZE, ret);
 
-        fprintf(stderr, "Error during decoding. Error code: %s\n", ret);
+        fprintf(stderr, "Error during decoding. Error code: %d\n", ret);
         return ret;
     }
 
@@ -317,7 +316,7 @@ static int dec_enc(AVPacket* pkt, const AVCodec* enc_codec, char* optstr)
 
 
 // example: qsv_transcode input.mp4 hevc_qsv output_hevc.mp4 "g 60 async_depth 1" 100 "g 120" (initialize codec with gop_size 60 and change it to 120 after 100 frames)
-
+// input.mp4 h264_qsv output_h264.mp4 "g 60"
 int qsv_tanscode(int argc, char** argv)
 {
     const AVCodec* enc_codec;
@@ -391,7 +390,7 @@ int qsv_tanscode(int argc, char** argv)
     /* flush decoder */
     av_packet_unref(dec_pkt);
     if ((ret = dec_enc(dec_pkt, enc_codec, argv[4])) < 0) {
-        fprintf(stderr, "Failed to flush decoder %s\n", ret);
+        fprintf(stderr, "Failed to flush decoder %d\n", ret);
         goto end;
     }
 

@@ -26,6 +26,12 @@ set(SOURCE_FILES
 
 	src/hw_decode.h
 	src/hw_decode.cpp
+
+	src/mft_encode.h
+	src/mft_encode.cpp
+
+	src/MFEncoderH264.h
+	src/MFEncoderH264.cpp
 )
 set(EXTERNAL_FILES lib/stb/stb_image.h)
 
